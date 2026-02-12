@@ -5,4 +5,3 @@ public enum CacheFeatures {
     BACKEND_CACHE,
     BACKEND_BUFFERS
 }
-

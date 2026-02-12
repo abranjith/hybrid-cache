@@ -1,5 +1,8 @@
 package dev.shetty.internal;
 
+import dev.shetty.utils.SystemUtils;
+import dev.shetty.utils.SystemUtils.MemoryPressure;
+
 import java.lang.ref.Cleaner;
 import java.lang.reflect.Array;
 import java.util.*;
@@ -95,7 +98,7 @@ public class SharedArrayPool<T> extends ArrayPool<T> {
             Partition<T>[] partitions = getOrCreatePartitions(bucketIndex);
 
             // Try current CPU's partition first, then others
-            int cpuId = getCurrentProcessorId() % getPartitionCount();
+            int cpuId = SystemUtils.getCurrentProcessorId() % getPartitionCount();
             for (int i = 0; i < partitions.length; i++) {
                 T[] array = partitions[cpuId].tryPop();
                 if (array != null) {
@@ -155,7 +158,7 @@ public class SharedArrayPool<T> extends ArrayPool<T> {
                 @SuppressWarnings("unchecked")
                 T[] prevArray = (T[]) previousArray;
                 Partition<T>[] partitions = getOrCreatePartitions(bucketIndex);
-                partitions[getCurrentProcessorId() % partitions.length].tryPush(prevArray);
+                partitions[SystemUtils.getCurrentProcessorId() % partitions.length].tryPush(prevArray);
             }
         }
     }
@@ -165,7 +168,7 @@ public class SharedArrayPool<T> extends ArrayPool<T> {
      */
     private boolean trim() {
         int currentMillis = (int) (System.currentTimeMillis() & 0x7FFFFFFF);
-        MemoryPressure pressure = getMemoryPressure();
+        MemoryPressure pressure = SystemUtils.getMemoryPressure();
 
         // Trim per-core buckets
         for (int i = 0; i < NUM_BUCKETS; i++) {
@@ -220,26 +223,18 @@ public class SharedArrayPool<T> extends ArrayPool<T> {
     }
 
     /**
-     * Gets the current processor ID for the executing thread.
-     * This is a simplified approach - Java doesn't directly expose thread affinity.
-     */
-    private static int getCurrentProcessorId() {
-        return Math.abs((int)(Thread.currentThread().threadId() % Runtime.getRuntime().availableProcessors()));
-    }
-
-    /**
      * Gets the number of partitions to use, based on available processors.
      */
     private static int getPartitionCount() {
         return Math.min(Runtime.getRuntime().availableProcessors(),
-                getEnvironmentInt("ARRAY_POOL_MAX_PARTITION_COUNT", Integer.MAX_VALUE));
+                SystemUtils.getEnvironmentInt("ARRAY_POOL_MAX_PARTITION_COUNT", Integer.MAX_VALUE));
     }
 
     /**
      * Gets the maximum arrays per partition.
      */
     private static int getMaxArraysPerPartition() {
-        return getEnvironmentInt("ARRAY_POOL_MAX_ARRAYS_PER_PARTITION", 32);
+        return SystemUtils.getEnvironmentInt("ARRAY_POOL_MAX_ARRAYS_PER_PARTITION", 32);
     }
 
     /**
@@ -261,41 +256,6 @@ public class SharedArrayPool<T> extends ArrayPool<T> {
      */
     private static int getMaxSizeForBucket(int bucketIndex) {
         return 16 << bucketIndex;
-    }
-
-    /**
-     * Gets an environment variable as an int.
-     */
-    private static int getEnvironmentInt(String variable, int defaultValue) {
-        String value = System.getenv(variable);
-        if (value != null) {
-            try {
-                return Integer.parseInt(value.trim());
-            } catch (NumberFormatException e) {
-                // Ignore and return default
-            }
-        }
-        return defaultValue;
-    }
-
-    /**
-     * Estimates current memory pressure based on available memory.
-     */
-    private static MemoryPressure getMemoryPressure() {
-        // Simple approximation based on available memory percentage
-        Runtime runtime = Runtime.getRuntime();
-        long maxMemory = runtime.maxMemory();
-        long totalFree = runtime.freeMemory();
-        long usedMemory = maxMemory - totalFree;
-        double memoryUsage = (double) usedMemory / maxMemory;
-
-        if (memoryUsage > 0.85) {
-            return MemoryPressure.HIGH;
-        } else if (memoryUsage > 0.70) {
-            return MemoryPressure.MEDIUM;
-        } else {
-            return MemoryPressure.LOW;
-        }
     }
 
     /**
@@ -429,12 +389,5 @@ public class SharedArrayPool<T> extends ArrayPool<T> {
                 lock.unlock();
             }
         }
-    }
-
-    /**
-     * Enum representing different memory pressure levels.
-     */
-    private enum MemoryPressure {
-        LOW, MEDIUM, HIGH
     }
 }

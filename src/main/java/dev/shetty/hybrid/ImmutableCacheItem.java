@@ -9,7 +9,6 @@ import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Represents a cache item for types that do not require defensive copies.
- * This class is final to prevent further extension, mirroring the sealed C# class.
  *
  * @param <T> The type of the value stored in the cache item.
  */

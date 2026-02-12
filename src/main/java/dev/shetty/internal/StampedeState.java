@@ -327,6 +327,12 @@ public final class StampedeState<TState, T> extends BaseStampedeState {
                             
                             // Set the result (includes L1 write if appropriate)
                             setResultPreSerialized(newValue, bufferToRelease, serializationResult.getSerializer());
+
+                            // MutableCacheItem.setValue takes ownership of the buffer's lifetime;
+                            // null out local ref so finally block doesn't double-recycle
+                            if (cacheItem instanceof MutableCacheItem) {
+                                bufferToRelease = null;
+                            }
                             
                             // Write to L2 if appropriate
                             if (!activeFlags.contains(HybridCacheEntryFlags.DISABLE_DISTRIBUTED_CACHE_WRITE)) {

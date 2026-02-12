@@ -10,6 +10,7 @@ import dev.shetty.internal.CacheFeatures;
 import dev.shetty.internal.HybridCacheEntryOptions;
 import dev.shetty.internal.HybridCacheOptions;
 import dev.shetty.internal.BufferChunk;
+import dev.shetty.internal.ByteArrayPool;
 import dev.shetty.internal.StampedeKey;
 import dev.shetty.internal.StampedeState;
 import dev.shetty.internal.PartitionedSyncLock;
@@ -312,7 +313,10 @@ public final class DefaultHybridCache extends HybridCache {
             IHybridCacheSerializer<T> serializer = getSerializer(type);
             if (serializer != null) {
                 byte[] data = serializer.serialize(value);
-                BufferChunk buffer = new BufferChunk(data, 0, data.length, true);
+                // Rent a pool buffer so recycleIfAppropriate() can safely return it
+                byte[] pooled = ByteArrayPool.getShared().take(data.length);
+                System.arraycopy(data, 0, pooled, 0, data.length);
+                BufferChunk buffer = new BufferChunk(pooled, 0, data.length, true);
                 return new SerializationResult<>(true, buffer, serializer);
             }
         } catch (Exception ex) {
@@ -539,8 +543,6 @@ public final class DefaultHybridCache extends HybridCache {
     public Logger getLogger() {
         return logger;
     }
-
-    // ---- Private helpers ----
 
     private boolean validateKey(String key) {
         if (key == null || key.isBlank()) {

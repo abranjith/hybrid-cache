@@ -9,7 +9,6 @@ import java.util.OptionalLong;
 
 /**
  * Represents a cache item for types that require defensive copies, stored in a serialized form.
- * This class is final to prevent further extension, mirroring the sealed C# class.
  *
  * @param <T> The type of the value stored in the cache item.
  */

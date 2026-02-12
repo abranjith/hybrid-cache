@@ -7,7 +7,7 @@ import java.util.Arrays;
  * Used to convey buffer status where Offset is always zero,
  * and we use the most significant bit of the length to track whether or not to recycle this value.
  * <p>
- * This class uses primitive {@code byte[]} to avoid the massive overhead of boxing
+ * This class uses primitive {@code byte[] vs Byte[]} to avoid the massive overhead of boxing
  * (each {@code Byte} object is ~16 bytes on a 64-bit JVM).
  */
 public final class BufferChunk {

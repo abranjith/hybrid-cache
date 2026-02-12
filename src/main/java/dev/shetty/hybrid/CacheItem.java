@@ -8,7 +8,6 @@ import java.util.OptionalLong;
 /**
  * Represents a typed item in the cache, extending the base CacheItem.
  * This class is abstract and serves as the foundation for mutable and immutable cache items.
- * It corresponds to the C# internal abstract class DefaultHybridCache.CacheItem<T>.
  *
  * @param <T> The type of the value stored in the cache item.
  */

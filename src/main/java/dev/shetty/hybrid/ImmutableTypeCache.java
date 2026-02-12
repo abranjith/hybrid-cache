@@ -9,8 +9,8 @@ import java.lang.reflect.Modifier;
  * internally by the caching system to optimize how cache entries are stored and handled.
  * By identifying immutable types, the system can avoid the overhead of creating defensive
  * copies of cached objects, leading to improved performance and reduced memory allocation.
- * The logic mirrors the original C# implementation by checking for well-known immutable
- * types, primitive types, and types explicitly marked with the {@link ImmutableObject} annotation.
+ * The logic checks for well-known immutable types, primitive types, and types explicitly
+ * marked with the {@link ImmutableObject} annotation.
  */
 public final class ImmutableTypeCache {
 

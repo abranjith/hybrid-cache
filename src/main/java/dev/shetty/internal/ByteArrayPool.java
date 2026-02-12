@@ -13,6 +13,20 @@ import java.util.concurrent.locks.ReentrantLock;
  * as {@link SharedArrayPool}, but specialized for {@code byte[]} to avoid the massive
  * overhead of boxing each byte into a {@code Byte} object (~16 bytes per element on 64-bit JVMs).
  * <p>
+ * <b>Example usage:</b>
+ * <pre>{@code
+ * ByteArrayPool pool = ByteArrayPool.getShared();
+ *
+ * // Request at least 100 bytes (may return a larger bucketed array, e.g. 128 bytes)
+ * byte[] buffer = pool.take(100);
+ * try {
+ *     // use buffer for serialization / I/O work
+ * } finally {
+ *     // return to pool; pass true if sensitive data should be cleared first
+ *     pool.giveBack(buffer, true);
+ * }
+ * }</pre>
+ * <p>
  * This class is thread-safe. All members may be used by multiple threads concurrently.
  */
 public final class ByteArrayPool {
@@ -171,8 +185,7 @@ public final class ByteArrayPool {
         return 16 << bucketIndex;
     }
 
-    // --- Inner classes ---
-
+    /** Helper class to hold thread-local arrays for each bucket. */
     private static final class ThreadLocalArrays {
         private final byte[][] arrays = new byte[NUM_BUCKETS][];
 
@@ -185,6 +198,15 @@ public final class ByteArrayPool {
         }
     }
 
+    /**
+     * A chunk of a larger byte array, with metadata about the active portion and whether it should be returned to the pool.
+     * This is used internally to manage buffers that may be larger than the requested size, and to track whether they should be returned to the pool when done.
+     * <p>
+     * The {@code lengthAndPoolFlag} field encodes both the active length of the buffer and a flag indicating whether it should be returned to the pool.
+     * The most significant bit is used as the flag, and the remaining bits represent the length. This allows us to store both pieces of information in a single int without additional fields.
+     * <p>
+     * This class is immutable and thread-safe. It is used as a return type for methods that need to return a buffer along with metadata about how to manage it.
+     */
     private static final class Partition {
         private static final int MAX_ARRAYS = 32;
         private final byte[][] arrays = new byte[MAX_ARRAYS][];
