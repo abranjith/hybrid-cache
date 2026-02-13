@@ -363,7 +363,6 @@ public final class DefaultHybridCache extends HybridCache {
      * @param canBeCanceled whether the operation can be canceled
      * @return a result containing the stampede state and whether this caller is the initiator
      */
-    @SuppressWarnings("unchecked")
     public <TState, T> StampedeResult<TState, T> getOrCreateStampedeState(
             String key,
             EnumSet<HybridCacheEntryFlags> flags,
@@ -488,6 +487,9 @@ public final class DefaultHybridCache extends HybridCache {
             return;
         }
 
+        ByteArrayPool pool = ByteArrayPool.getShared();
+        byte[] oversized = null;
+        byte[] typedOversized = null;
         try {
             // Serialize using HybridCachePayload format
             byte[] serializedData = buffer.toArray();
@@ -495,13 +497,13 @@ public final class DefaultHybridCache extends HybridCache {
             Duration duration = options != null ? getL2AbsoluteExpirationRelativeToNow(options) : (this.options.getDefaultEntryOptions() != null ? this.options.getDefaultEntryOptions().getExpiration() : defaultExpiration);
             long creationTime = getCurrentTimestamp();
             
-            // Calculate required buffer size
+            // Rent from pool instead of allocating (mirrors C# ArrayPool<byte>.Shared.Rent)
             int maxSize = HybridCachePayload.getMaxBytes(key, tags, serializedData.length);
-            byte[] payloadBuffer = new byte[maxSize];
+            oversized = pool.take(maxSize);
             
-            // Write the payload
+            // Write the payload into the rented buffer
             int bytesWritten = HybridCachePayload.write(
-                payloadBuffer,
+                oversized,
                 key,
                 creationTime,
                 duration,
@@ -509,31 +511,48 @@ public final class DefaultHybridCache extends HybridCache {
                 tags,
                 serializedData
             );
-            
-            // Trim to actual size
-            byte[] hybridPayload = bytesWritten == payloadBuffer.length 
-                ? payloadBuffer 
-                : Arrays.copyOf(payloadBuffer, bytesWritten);
 
             // Wrap with type metadata if type is known
             byte[] finalPayload;
+            int finalLength;
             if (type != null) {
                 byte[] typeNameBytes = type.getName().getBytes(java.nio.charset.StandardCharsets.UTF_8);
-                finalPayload = new byte[4 + typeNameBytes.length + hybridPayload.length];
-                finalPayload[0] = (byte) (typeNameBytes.length >> 24);
-                finalPayload[1] = (byte) (typeNameBytes.length >> 16);
-                finalPayload[2] = (byte) (typeNameBytes.length >> 8);
-                finalPayload[3] = (byte) (typeNameBytes.length);
-                System.arraycopy(typeNameBytes, 0, finalPayload, 4, typeNameBytes.length);
-                System.arraycopy(hybridPayload, 0, finalPayload, 4 + typeNameBytes.length, hybridPayload.length);
+                int totalLength = 4 + typeNameBytes.length + bytesWritten;
+                typedOversized = pool.take(totalLength);
+                typedOversized[0] = (byte) (typeNameBytes.length >> 24);
+                typedOversized[1] = (byte) (typeNameBytes.length >> 16);
+                typedOversized[2] = (byte) (typeNameBytes.length >> 8);
+                typedOversized[3] = (byte) (typeNameBytes.length);
+                System.arraycopy(typeNameBytes, 0, typedOversized, 4, typeNameBytes.length);
+                System.arraycopy(oversized, 0, typedOversized, 4 + typeNameBytes.length, bytesWritten);
+                finalPayload = typedOversized;
+                finalLength = totalLength;
             } else {
-                finalPayload = hybridPayload;
+                finalPayload = oversized;
+                finalLength = bytesWritten;
+            }
+
+            // Backend needs a right-sized array since we don't control its lifetime.
+            // If the rented buffer is already right-sized, use it directly; otherwise copy.
+            byte[] toWrite;
+            if (finalPayload.length == finalLength) {
+                toWrite = finalPayload;
+            } else {
+                toWrite = Arrays.copyOf(finalPayload, finalLength);
             }
             
             // Write to backend
-            backendCache.set(key, finalPayload, options != null ? options.toCacheEntryOptions() : null);
+            backendCache.set(key, toWrite, options != null ? options.toCacheEntryOptions() : null);
         } catch (Exception ex) {
             logger.warning("Failed to set L2 cache: " + ex.getMessage());
+        } finally {
+            // Return rented buffers to the pool (mirrors C# ArrayPool<byte>.Shared.Return)
+            if (oversized != null) {
+                pool.giveBack(oversized);
+            }
+            if (typedOversized != null) {
+                pool.giveBack(typedOversized);
+            }
         }
     }
 
