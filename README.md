@@ -584,7 +584,7 @@ The C# `HybridCache` uses `ValueTask<T>` because .NET's `async/await` is pervasi
 ## References
 
 - [.NET HybridCache documentation](https://learn.microsoft.com/en-us/aspnet/core/performance/caching/hybrid) — Official Microsoft documentation
-- [.NET HybridCache source code](https://github.com/dotnet/aspnetcore/tree/main/src/Caching/Hybrid/src) — The C# implementation this project is ported from
+- [.NET HybridCache source code](https://source.dot.net/#Microsoft.Extensions.Caching.Abstractions/Hybrid/HybridCache.cs) — The C# implementation this project is ported from
 - [HybridCache API reference](https://learn.microsoft.com/en-us/dotnet/api/microsoft.extensions.caching.hybrid.hybridcache) — .NET API docs
 - [ASP.NET Core caching overview](https://learn.microsoft.com/en-us/aspnet/core/performance/caching/overview) — Context on the caching landscape
 - [JEP 444: Virtual Threads](https://openjdk.org/jeps/444) — Java 21 virtual threads (the foundation for this library's synchronous API)

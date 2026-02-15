@@ -110,13 +110,11 @@ public final class DefaultHybridCache extends HybridCache {
         // Try L1 (local cache) unless disabled
         if (!flags.contains(HybridCacheEntryFlags.DISABLE_LOCAL_CACHE_READ)) {
             Optional<CacheItem<T>> cached = tryGetExisting(key);
-            if (cached.isPresent() && cached.get().tryReserve()) {
+            if (cached.isPresent()) {
                 Optional<T> value = cached.get().tryGetValue();
                 if (value.isPresent()) {
                     // L1 hit - return immediately
-                    T result = value.get();
-                    cached.get().release();
-                    return result;
+                    return value.get();
                 }
             }
         }
